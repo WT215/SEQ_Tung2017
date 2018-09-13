@@ -151,6 +151,21 @@ $(document).ready(function () {
 <h1>Print lines in file1 not in file2, and vice versa.</h1>
 <pre class="bash"><code>comm -3  SRR_Acc_List.txt SRR_Acc_List_bulk.txt &gt; SRR_Acc_List_single.txt</code></pre>
 </div>
+<div id="line-breaks" class="section level1">
+<h1>Line breaks</h1>
+<p>line break is <code>\r\n</code> on windows and on UNIX machines it is <code>\n</code></p>
+<pre class="bash"><code>LFS=$'\n'</code></pre>
+</div>
+<div id="copy-files-according-to-a-given-list-of-file-names" class="section level1">
+<h1>copy files according to a given list of file names</h1>
+<pre class="bash"><code>#!/bin/bash
+filename='peptides.txt'
+filelines=`cat $filename`
+echo Start
+for line in $filelines ; do
+    echo $line
+done</code></pre>
+</div>
 
 
 

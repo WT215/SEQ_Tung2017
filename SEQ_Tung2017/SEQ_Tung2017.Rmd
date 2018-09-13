@@ -37,3 +37,21 @@ comm -3  SRR_Acc_List.txt SRR_Acc_List_bulk.txt > SRR_Acc_List_single.txt
 ```
 
 
+#Line breaks
+line break is `\r\n` on windows and on UNIX machines it is `\n`
+```{bash, eval = FALSE}
+LFS=$'\n'
+```
+
+
+#copy files according to a given list of file names
+
+```{bash, eval = FALSE}
+#!/bin/bash
+filename='peptides.txt'
+filelines=`cat $filename`
+echo Start
+for line in $filelines ; do
+    echo $line
+done
+```
