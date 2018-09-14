@@ -10,10 +10,10 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 #GSE77288
 
-#download GEO 
+# download GEO 
 SRA Run Selector: GSE**** -> Accession List -> SRR_Acc_List.txt
 
-#use aspera
+# use aspera
 ```{bash, eval = FALSE}
 sratoolkit.2.9.2-ubuntu64/bin/prefetch -t fasp -a ".aspera/connect/bin/ascp|.aspera/connect/etc/asperaweb_id_dsa.openssh" SRR390728
 ```
@@ -27,24 +27,24 @@ sratoolkit.2.9.2-ubuntu64/bin/prefetch -t fasp -a ".aspera/connect/bin/ascp|.asp
 sratoolkit.2.9.2-ubuntu64/bin/prefetch -t fasp -a ".aspera/connect/bin/ascp|.aspera/connect/etc/asperaweb_id_dsa.openssh" --ascp-options "-l 1g -m 500m" --option-file ~/Downloads/SRR_Acc_List.txt
 ```
 
-#intersection:
+# intersection:
 ```{bash, eval = FALSE}
 comm -12  SRR_Acc_List.txt SRR_Acc_List_bulk.txt >output.txt
 ```
-#Print lines in file1 not in file2, and vice versa.
+# Print lines in file1 not in file2, and vice versa.
 ```{bash, eval = FALSE}
 comm -3  SRR_Acc_List.txt SRR_Acc_List_bulk.txt > SRR_Acc_List_single.txt
 ```
 
 
-#Line breaks
+# Line breaks
 line break is `\r\n` on windows and on UNIX machines it is `\n`
 ```{bash, eval = FALSE}
 LFS=$'\n'
 ```
 
 
-#copy files according to a given list of file names
+# copy files according to a given list of file names
 
 ```{bash, eval = FALSE}
 #!/bin/bash
@@ -54,4 +54,8 @@ echo Start
 for line in $filelines ; do
     echo $line
 done
+```
+
+```{bash, eval = FALSE}
+for line in $filelines; do cp "./All/$line.sra" ./Single ; done
 ```
