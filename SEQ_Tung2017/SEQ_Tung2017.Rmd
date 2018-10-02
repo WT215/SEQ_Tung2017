@@ -1,5 +1,5 @@
 ---
-title: "SEQ_Tung2017"
+title: "Many steps for downloading and preprocessing raw sequencing datasets"
 author: "Wenhao Tang"
 #date: "2018年9月13日"
 output: html_document
@@ -8,17 +8,29 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
-#GSE77288
+# GSE77288
+In this note, based on GSE77288 dataset, I tried to record the many steps of preprocessing raw sequencing data. From downloading very large sequencing data to obtaining the final count matrix.
 
-# download GEO 
+# Downloading GEO (SRA)
 SRA Run Selector: GSE**** -> Accession List -> SRR_Acc_List.txt
 
-# use aspera
+
+In `SRR_Acc_List.txt` (Just show a few lines):
+```{bash, eval=FALSE}
+(baynorm) -bash-4.2$ less SRR_Acc_List.txt
+SRR3126345
+SRR3126346
+SRR3126347
+SRR3126348
+```
+
+
+## Using aspera (a toy example)
 ```{bash, eval = FALSE}
 sratoolkit.2.9.2-ubuntu64/bin/prefetch -t fasp -a ".aspera/connect/bin/ascp|.aspera/connect/etc/asperaweb_id_dsa.openssh" SRR390728
 ```
 
-# use aspera, specify maximum speed
+## Using aspera, specifying maximum speed (a toy example)
 ```{bash, eval = FALSE}
 sratoolkit.2.9.2-ubuntu64/bin/prefetch -t fasp -a ".aspera/connect/bin/ascp|.aspera/connect/etc/asperaweb_id_dsa.openssh" --ascp-options "-l 1g -m 500m" SRR390728
 ```
@@ -27,35 +39,161 @@ sratoolkit.2.9.2-ubuntu64/bin/prefetch -t fasp -a ".aspera/connect/bin/ascp|.asp
 sratoolkit.2.9.2-ubuntu64/bin/prefetch -t fasp -a ".aspera/connect/bin/ascp|.aspera/connect/etc/asperaweb_id_dsa.openssh" --ascp-options "-l 1g -m 500m" --option-file ~/Downloads/SRR_Acc_List.txt
 ```
 
-# intersection:
-```{bash, eval = FALSE}
-comm -12  SRR_Acc_List.txt SRR_Acc_List_bulk.txt >output.txt
-```
-# Print lines in file1 not in file2, and vice versa.
+
+
+
+## Print lines in file1 not in file2, and vice versa.
+We have `SRR_Acc_List.txt` which listed all SRA file names, we also have `SRR_Acc_List_bulk.txt` which listed all bulk SRA file names, now we want to extract single SRA file names into another txt file:
 ```{bash, eval = FALSE}
 comm -3  SRR_Acc_List.txt SRR_Acc_List_bulk.txt > SRR_Acc_List_single.txt
 ```
+Examples of `comm`:
+  `comm -12 file1 file2`  Print only lines present in both file1 and file2.
+  `comm -3 file1 file2`  Print lines in file1 not in file2, and vice versa.
 
 
-# Line breaks
+
+
+
+### Tip: Line breaks
 line break is `\r\n` on windows and on UNIX machines it is `\n`
 ```{bash, eval = FALSE}
 LFS=$'\n'
 ```
 
-
-# copy files according to a given list of file names
+# Transforming SRA to fastq
 
 ```{bash, eval = FALSE}
 #!/bin/bash
-filename='peptides.txt'
-filelines=`cat $filename`
-echo Start
-for line in $filelines ; do
-    echo $line
+/work/wt215/Tung_2017/Single_fastq/sratools/bin/fastq-dump --split-3 --gzip ./*.sra -O ./
+```
+
+`qsub` file: submit job to HPC
+```{bash, eval=FALSE}
+#!/bin/bash
+
+#PBS -lselect=1:ncpus=8:mem=16gb
+#PBS -lwalltime=72:00:00
+#PBS -J 1-9
+
+## Run 9 copies of this job (-J 1-9)
+## The environment variable $PBS_ARRAY_INDEX gives each
+## subjob's index within the array
+
+## All subjobs run independently of one another
+
+# Copy any input for this subjob from the submission directory
+# to the fast temporary directory created for the job
+cp $PBS_O_WORKDIR/* $TMPDIR
+
+((count = PBS_ARRAY_INDEX - 1))
+#cp $PBS_O_WORKDIR/$PBS_ARRAY_INDEX/* .
+
+
+
+xargs -a /work/wt215/Tung_2017/Single/single$count cp -t .
+
+
+chmod +x ./bash_script.sh
+
+# Run program, passing the index of this subjob within the array
+# a.out $PBS_ARRAY_INDEX
+./bash_script.sh $PBS_ARRAY_INDEX
+
+# Copy any output back to a directory in $WORK
+mkdir -p /work/wt215/Tung_2017/Single_qsub/$PBS_JOBID
+
+#cp output.txt $WORK/PBS_JOBID
+cp $TMPDIR/*.fastq.gz /work/wt215/Tung_2017/Single_qsub/$PBS_JOBID
+```
+
+
+
+
+
+### Tip: copy files according to a given list of file names
+Now we need to separate bulk and single SRA files into two different directories.
+```{bash, eval = FALSE}
+for line in $filelines; do 
+    cp "./All/$line.sra" ./Single ; 
 done
 ```
 
+### Tip: We can separate many SRA files into chuncks, then using throughput-array CX1 cluster for transforming sra to fastq
+
 ```{bash, eval = FALSE}
-for line in $filelines; do cp "./All/$line.sra" ./Single ; done
+# Firstly, extract SRR names, then separate them into multiple chunks:
+ls |grep SRR> try.txt
+
+#Split lines in a txt to several txt such that each txt contains 1 line. output filenames: new0000, new0001, new0002, ... 
+split -a 4 -d -l 1 try.txt new
+
+#Copy files according to list of file names in a file (for example, new0000 as shown below):
+#source: https://serverfault.com/questions/212439/linux-mv-or-cp-specific-files-from-a-text-list-of-files
+xargs -a new0000 cp -t ./try/
 ```
+
+
+### Tip: calculation in bash
+```{bash, eval = FALSE}
+#You can use:
+#((count = FIRSTV - SECONDV))
+#to avoid invoking a separate process, as per the following transcript:
+pax:~$ FIRSTV=7
+pax:~$ SECONDV=2
+pax:~$ ((count = FIRSTV - SECONDV))
+pax:~$ echo $count
+5
+```
+
+
+# Run fastqc, combine results using multiqc
+```{bash, eval = FALSE}
+#fastqc
+FastQC/fastqc Tung_2017/Single_fastq/*.fastq.gz -o Tung_2017/fastingle/
+
+#combine fastqc reports using "multiqc"
+multiqc "path to where stores fastqc reports (html)"
+```
+
+
+# Trim reads 
+
+## A toy example using sickle
+```{bash, eval = FALSE}
+sickle se -f SRR3126350.fastq.gz -t sanger -o ./trim_try/SRR3126350trim.fastq.gz -g -x
+```
+
+## Full bash script for usign sickle
+```{bash, eval = FALSE}
+#!/bin/bash
+set -e
+
+FILE=$1
+BASE=`basename ${FILE%.fastq.gz}`
+OUTDIR=/work/wt215/Tung_2017/Single_fastq/debug_fastqc
+
+#mkdir -p $OUTDIR
+
+if [ ! -s $FILE ]
+then
+  echo "File is missing or empty: $FILE"
+  exit 65
+fi
+
+if [ -s $OUTDIR/$BASE.sickle.fastq.gz ]
+then
+  echo "Output file already exists: $OUTDIR/$BASE.sickle.fastq.gz"
+  exit 64
+fi
+
+# Run sickle only cutting from the 3' end
+sickle se -f <(zcat $FILE) -t sanger -o $OUTDIR/$BASE.sickle.fastq.gz -x -g
+
+bioawk -c fastx 'END{print NR}' $OUTDIR/$BASE.sickle.fastq.gz > $OUTDIR/$BASE.sickle.count.txt
+```
+
+
+
+
+
